@@ -4,6 +4,13 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
 		<title>Booth Builder</title>
+		<!--
+			The Web export's page (html/custom_html_shell): Godot's own, plus the app's
+			loading screen, which covers the page from the moment it opens until the
+			app says it's ready (see ui/loading_screen.gd). The page draws it rather than
+			Godot: compiling shaders stops Godot from drawing for a second or more at a
+			time, while the page's animations keep moving.
+		-->
 		<style>
 html, body, #canvas {
 	margin: 0;
@@ -13,7 +20,7 @@ html, body, #canvas {
 
 body {
 	color: white;
-	background-color: black;
+	background-color: #5c6773;
 	overflow: hidden;
 	touch-action: none;
 }
@@ -26,68 +33,164 @@ body {
 	outline: none;
 }
 
-#status, #status-splash, #status-progress {
+/* The start screen's sky (LoadingScreen.SKY_TOP and SKY_BOTTOM), and its
+   sizes in the app's 1600 x 900 layout: --u is one unit of it, as the app
+   scales it to the window, but never so small it can't be read. */
+#loading {
+	--u: max(0.75px, min(calc(100vw / 1600), calc(100vh / 900)));
 	position: absolute;
-	left: 0;
-	right: 0;
-}
-
-#status, #status-splash {
-	top: 0;
-	bottom: 0;
-}
-
-#status {
-	background-color: #242424;
+	inset: 0;
+	z-index: 1;
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
+	background: linear-gradient(#9298a0, #5c6773);
+	font-family: 'Open Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+	font-weight: 600;
+	font-size: calc(16 * var(--u));
+	transition: opacity 0.25s;
+	user-select: none;
+}
+
+#loading.done {
+	opacity: 0;
+	pointer-events: none;
+}
+
+/* As tall as the start screen's content (title, subtitle, cards, status), and
+   centred the same way, so the title is where the start screen's will be. */
+#loading-column {
+	width: min(calc(440 * var(--u)), calc(100vw - 32px));
+	min-height: calc(385 * var(--u));
+	display: flex;
+	flex-direction: column;
+	gap: calc(24 * var(--u));
+}
+
+#loading-body {
+	display: flex;
+	flex-direction: column;
+	gap: calc(20 * var(--u));
+}
+
+#loading h1 {
+	margin: 0;
+	text-align: center;
+	font-size: calc(48 * var(--u));
+	line-height: calc(67 * var(--u));
+	font-weight: 600;
+	-webkit-text-stroke: calc(8 * var(--u)) #121314;
+	paint-order: stroke fill;
+}
+
+/* Moved by transform, which the browser animates even while the app is busy. */
+#loading-bar {
+	position: relative;
+	height: calc(8 * var(--u));
+	border-radius: calc(4 * var(--u));
+	background: rgba(255, 255, 255, 0.14);
+	overflow: hidden;
+}
+
+#loading-fill {
+	position: absolute;
+	inset: 0;
+	background: #73a6ff;
+	transform-origin: left;
+	transform: scaleX(0);
+	transition: transform 0.6s ease-out;
+}
+
+/* A light passing along the bar: it's working, even between steps. */
+#loading-bar::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 30%;
+	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+	animation: loading-pass 1.6s linear infinite;
+}
+
+/* The app can't run here: the note says why, in place of the progress. */
+#loading.failed #loading-bar {
 	visibility: hidden;
 }
 
-#status-splash {
-	max-height: 100%;
-	max-width: 100%;
-	margin: auto;
+@keyframes loading-pass {
+	from { transform: translateX(-100%); }
+	to { transform: translateX(340%); }
 }
 
-#status-splash.show-image--false {
-	display: none;
+#loading-steps {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: calc(8 * var(--u));
 }
 
-#status-splash.fullsize--true {
-	height: 100%;
-	width: 100%;
-	object-fit: contain;
+#loading-steps li {
+	display: flex;
+	align-items: center;
+	gap: calc(10 * var(--u));
 }
 
-#status-splash.use-filter--false {
-	image-rendering: pixelated;
+#loading-steps li.waiting .title {
+	opacity: 0.6;
 }
 
-#status-progress, #status-notice {
-	display: none;
+#loading-steps .title {
+	flex: 1;
 }
 
-#status-progress {
-	bottom: 10%;
-	width: 50%;
-	margin: 0 auto;
+#loading-steps .detail {
+	opacity: 0.75;
 }
 
-#status-notice {
-	background-color: #5b3943;
-	border-radius: 0.5rem;
+#loading-steps li.failed .detail {
+	opacity: 1;
+	color: #ff6659;
+}
+
+#loading-steps svg {
+	width: calc(16 * var(--u));
+	height: calc(16 * var(--u));
+	flex: none;
+}
+
+#loading-steps li.active svg {
+	animation: loading-pulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes loading-pulse {
+	from { opacity: 1; }
+	to { opacity: 0.35; }
+}
+
+#loading-note {
+	margin: 0;
+	text-align: center;
+	font-size: calc(14 * var(--u));
+	opacity: 0.8;
+	line-height: 1.4;
+}
+
+#loading-note.error {
+	opacity: 1;
+	padding: calc(12 * var(--u));
+	border-radius: calc(6 * var(--u));
+	background: #5b3943;
 	border: 1px solid #9b3943;
 	color: #e0e0e0;
-	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
-	line-height: 1.3;
-	margin: 0 2rem;
-	overflow: hidden;
-	padding: 1rem;
-	text-align: center;
-	z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#loading-bar::after, #loading-steps li.active svg {
+		animation: none;
+	}
 }
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
@@ -103,116 +206,173 @@ body {
 			Your browser does not support JavaScript.
 		</noscript>
 
-		<div id="status">
-			<img id="status-splash" class="show-image--true fullsize--false use-filter--true" src="index.png" alt="">
-			<progress id="status-progress"></progress>
-			<div id="status-notice"></div>
+		<div id="loading" role="status" aria-live="polite">
+			<div id="loading-column">
+				<h1>Booth Builder</h1>
+				<div id="loading-body">
+					<div id="loading-bar"><div id="loading-fill"></div></div>
+					<ol id="loading-steps"></ol>
+					<p id="loading-note" hidden></p>
+				</div>
+			</div>
 		</div>
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":2307012,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":2319532,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
 (function () {
-	const statusOverlay = document.getElementById('status');
-	const statusProgress = document.getElementById('status-progress');
-	const statusNotice = document.getElementById('status-notice');
+	const overlay = document.getElementById('loading');
+	const fill = document.getElementById('loading-fill');
+	const list = document.getElementById('loading-steps');
+	const note = document.getElementById('loading-note');
 
-	let initializing = true;
-	let statusMode = '';
+	// States in order: a step never goes back.
+	const ORDER = ['waiting', 'active', 'done', 'failed'];
+	// Weights as Startup's: each step's share of a first start.
+	const pageSteps = [
+		{ title: 'Downloading the app', weight: 0.10, state: 'active', fraction: 0, detail: '' },
+		{ title: 'Starting', weight: 0.12, state: 'waiting', fraction: 0, detail: '' },
+	];
+	// The app's steps (Startup.steps()), until it sends its own.
+	let appSteps = [
+		{ title: 'Loading the catalogue', weight: 0.03, state: 'waiting', fraction: 0, detail: '' },
+		{ title: 'Preparing 3D graphics', weight: 0.75, state: 'waiting', fraction: 0, detail: '' },
+	];
+	let shown = 0;
+	let finished = false;
+	let failsafe = 0;
 
-	function setStatusMode(mode) {
-		if (statusMode === mode || !initializing) {
-			return;
+	const MARKS = {
+		waiting: '<circle cx="8" cy="8" r="5" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.5"/>',
+		active: '<circle cx="8" cy="8" r="5" fill="#73a6ff"/>',
+		done: '<path d="M3 8l3.5 3.5L13.5 4" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+		failed: '<path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="#ff6659" stroke-width="2" stroke-linecap="round"/>',
+	};
+
+	function advance(step, state) {
+		if (ORDER.indexOf(state) > ORDER.indexOf(step.state)) {
+			step.state = state;
 		}
-		if (mode === 'hidden') {
-			statusOverlay.remove();
-			initializing = false;
-			return;
-		}
-		statusOverlay.style.visibility = 'visible';
-		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
-		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
-		statusMode = mode;
 	}
 
-	function setStatusNotice(text) {
-		while (statusNotice.lastChild) {
-			statusNotice.removeChild(statusNotice.lastChild);
+	function render() {
+		const steps = pageSteps.concat(appSteps);
+		let done = 0;
+		let total = 0;
+		for (const step of steps) {
+			const over = step.state === 'done' || step.state === 'failed';
+			done += step.weight * (over ? 1 : Math.min(Math.max(step.fraction, 0), 1));
+			total += step.weight;
 		}
-		const lines = text.split('\n');
-		lines.forEach((line) => {
-			statusNotice.appendChild(document.createTextNode(line));
-			statusNotice.appendChild(document.createElement('br'));
+		shown = Math.max(shown, total > 0 ? done / total : 0);
+		fill.style.transform = 'scaleX(' + shown + ')';
+		while (list.children.length < steps.length) {
+			const row = document.createElement('li');
+			row.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"></svg><span class="title"></span><span class="detail"></span>';
+			list.appendChild(row);
+		}
+		steps.forEach(function (step, i) {
+			const row = list.children[i];
+			if (row.className !== step.state) {
+				row.className = step.state;
+				row.firstChild.innerHTML = MARKS[step.state] || MARKS.waiting;
+			}
+			row.children[1].textContent = step.title;
+			row.children[2].textContent = step.detail;
 		});
 	}
 
-	function displayFailureNotice(err) {
-		console.error(err);
-		if (err instanceof Error) {
-			setStatusNotice(err.message);
-		} else if (typeof err === 'string') {
-			setStatusNotice(err);
-		} else {
-			setStatusNotice('An unknown error occurred.');
-		}
-		setStatusMode('notice');
-		initializing = false;
+	function showNote(text, error) {
+		note.hidden = !text;
+		note.textContent = text;
+		note.classList.toggle('error', Boolean(error));
 	}
 
+	// Hands over to the app.
+	function finish() {
+		if (finished) {
+			return;
+		}
+		finished = true;
+		clearTimeout(failsafe);
+		overlay.classList.add('done');
+		setTimeout(function () {
+			overlay.remove();
+		}, 300);
+		document.getElementById('canvas').focus();
+	}
+
+	// If the app never reports (it failed to start), it isn't kept hidden. Once
+	// it has, it says when it's done: a slow download may leave it quiet a while.
+	function watch() {
+		clearTimeout(failsafe);
+		failsafe = setTimeout(finish, 60000);
+	}
+
+	// Called by the app (LoadingScreen).
+	window.boothLoading = {
+		update: function (state) {
+			advance(pageSteps[0], 'done');
+			advance(pageSteps[1], 'done');
+			pageSteps[0].detail = '';
+			appSteps = state.steps;
+			showNote(state.note, false);
+			render();
+			clearTimeout(failsafe);
+		},
+		finish: finish,
+	};
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		let text = 'An unknown error occurred.';
+		if (err instanceof Error) {
+			text = err.message;
+		} else if (typeof err === 'string') {
+			text = err;
+		}
+		clearTimeout(failsafe);
+		pageSteps.concat(appSteps).forEach(function (step) {
+			if (step.state === 'active') {
+				step.state = 'failed';
+			}
+		});
+		overlay.classList.add('failed');
+		render();
+		showNote(text, true);
+	}
+
+	render();
 	const missing = Engine.getMissingFeatures({
 		threads: GODOT_THREADS_ENABLED,
 	});
-
 	if (missing.length !== 0) {
-		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
-			let serviceWorkerRegistrationPromise;
-			try {
-				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
-			} catch (err) {
-				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
-			}
-			// There's a chance that installing the service worker would fix the issue
-			Promise.race([
-				serviceWorkerRegistrationPromise.then((registration) => {
-					if (registration != null) {
-						return Promise.reject(new Error('Service worker already exists.'));
-					}
-					return registration;
-				}).then(() => engine.installServiceWorker()),
-				// For some reason, `getRegistration()` can stall
-				new Promise((resolve) => {
-					setTimeout(() => resolve(), 2000);
-				}),
-			]).then(() => {
-				// Reload if there was no error.
-				window.location.reload();
-			}).catch((err) => {
-				console.error('Error while registering service worker:', err);
-			});
-		} else {
-			// Display the message as usual
-			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
-			displayFailureNotice(missingMsg + missing.join('\n'));
-		}
-	} else {
-		setStatusMode('progress');
-		engine.startGame({
-			'onProgress': function (current, total) {
-				if (current > 0 && total > 0) {
-					statusProgress.value = current;
-					statusProgress.max = total;
-				} else {
-					statusProgress.removeAttribute('value');
-					statusProgress.removeAttribute('max');
-				}
-			},
-		}).then(() => {
-			setStatusMode('hidden');
-		}, displayFailureNotice);
+		displayFailureNotice('This browser can\'t run Booth Builder. It\'s missing: ' + missing.join(', ') + '.');
+		return;
 	}
+	engine.startGame({
+		'onProgress': function (current, total) {
+			if (current > 0 && total > 0) {
+				pageSteps[0].fraction = current / total;
+				pageSteps[0].detail = Math.floor(100 * current / total) + '%';
+				if (current >= total) {
+					advance(pageSteps[0], 'done');
+					pageSteps[0].detail = '';
+					advance(pageSteps[1], 'active');
+				}
+				render();
+			}
+		},
+	}).then(function () {
+		advance(pageSteps[0], 'done');
+		pageSteps[0].detail = '';
+		advance(pageSteps[1], 'active');
+		render();
+		watch();
+	}, displayFailureNotice);
 }());
 		</script>
 	</body>
