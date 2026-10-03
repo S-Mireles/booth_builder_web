@@ -123,6 +123,8 @@ body {
 #loading-column {
 	width: min(calc(440 * var(--u)), calc(100vw - 32px));
 	min-height: calc(385 * var(--u));
+	/* Taller where the start screen draws bigger (fitColumn below). */
+	min-height: var(--start-height, calc(385 * var(--u)));
 	display: flex;
 	flex-direction: column;
 	gap: calc(24 * var(--u));
@@ -280,7 +282,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1531488,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1534448,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -442,6 +444,38 @@ const engine = new Engine(GODOT_CONFIG);
 		render();
 		showNote(text, true);
 	}
+
+	// The start screen draws bigger, its cards wrapped, where the window is tall
+	// (StartScreen.fit_cards): the loading screen stays as tall as it is drawn,
+	// so the title doesn't move when the app takes over. Copies of the app's.
+	const START_CARDS = 6;
+	const START_OTHERS = 185;
+	const CARD_W = 220;
+	const CARD_H = 200;
+	const CARD_GAP = 24;
+	const ROOM = 0.9;
+	const WRAP_GAIN = 1.5;
+	function fitColumn() {
+		const appScale = Math.min(window.innerWidth / 1600, window.innerHeight / 900);
+		const roomX = window.innerWidth / appScale;
+		const roomY = window.innerHeight / appScale;
+		let rows = 1;
+		let scale = 1;
+		for (let columns = START_CARDS - 1; columns > 1; columns--) {
+			const r = Math.ceil(START_CARDS / columns);
+			const fitted = Math.min(roomX * ROOM / (columns * CARD_W + (columns - 1) * CARD_GAP),
+				roomY * ROOM / (START_OTHERS + r * CARD_H + (r - 1) * CARD_GAP));
+			if (fitted >= WRAP_GAIN && fitted > scale) {
+				rows = r;
+				scale = fitted;
+			}
+		}
+		const units = (START_OTHERS + rows * CARD_H + (rows - 1) * CARD_GAP) * scale;
+		// A variable, not the column's own style: opening a booth and the veil keep their min-height: 0.
+		document.documentElement.style.setProperty('--start-height', 'calc(' + units.toFixed(1) + ' * var(--u))');
+	}
+	fitColumn();
+	window.addEventListener('resize', fitColumn);
 
 	render();
 	const missing = Engine.getMissingFeatures({
